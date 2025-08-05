@@ -10,6 +10,8 @@ pub mod generic_matrix_methods;
 
 pub mod ops;
 
+pub mod vector;
+
 create_matrix_interface!(FloatMatrix, f64);
 
 #[pymodule]
