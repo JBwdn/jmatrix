@@ -195,3 +195,231 @@ where
         _ => panic!("Invalid axis: only 0 and 1 are supported for 2D matrices"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ops::initialisers;
+
+    #[test]
+    fn test_mean_axis_0() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0, 3.0],
+            vec![4.0, 5.0, 6.0],
+        ]);
+        let result = mean(&matrix, Some(0));
+        let expected = vec![
+            vec![2.0],  // (1+2+3)/3 = 2
+            vec![5.0],  // (4+5+6)/3 = 5
+        ];
+        assert_eq!(result.data, expected);
+    }
+
+    #[test]
+    fn test_mean_axis_1() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0, 3.0],
+            vec![4.0, 5.0, 6.0],
+        ]);
+        let result = mean(&matrix, Some(1));
+        let expected = vec![
+            vec![2.5, 3.5, 4.5],  // (1+4)/2, (2+5)/2, (3+6)/2
+        ];
+        assert_eq!(result.data, expected);
+    }
+
+    #[test]
+    fn test_mean_default_axis() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        let result = mean(&matrix, None); // Should default to axis 0
+        let expected = vec![
+            vec![1.5],  // (1+2)/2 = 1.5
+            vec![3.5],  // (3+4)/2 = 3.5
+        ];
+        assert_eq!(result.data, expected);
+    }
+
+    #[test]
+    fn test_mean_single_element() {
+        let matrix = initialisers::matrix_from_data(vec![vec![5.0]]);
+        let result = mean(&matrix, Some(0));
+        assert_eq!(result.data, vec![vec![5.0]]);
+        
+        let result = mean(&matrix, Some(1));
+        assert_eq!(result.data, vec![vec![5.0]]);
+    }
+
+    #[test]
+    fn test_mean_single_row() {
+        let matrix = initialisers::matrix_from_data(vec![vec![1.0, 2.0, 3.0, 4.0]]);
+        let result = mean(&matrix, Some(0));
+        assert_eq!(result.data, vec![vec![2.5]]); // (1+2+3+4)/4 = 2.5
+        
+        let result = mean(&matrix, Some(1));
+        assert_eq!(result.data, vec![vec![1.0, 2.0, 3.0, 4.0]]); // Each column averaged across 1 row
+    }
+
+    #[test]
+    fn test_mean_single_column() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0],
+            vec![2.0],
+            vec![3.0],
+        ]);
+        let result = mean(&matrix, Some(0));
+        let expected = vec![vec![1.0], vec![2.0], vec![3.0]]; // Each row averaged across 1 column
+        assert_eq!(result.data, expected);
+        
+        let result = mean(&matrix, Some(1));
+        assert_eq!(result.data, vec![vec![2.0]]); // (1+2+3)/3 = 2
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid axis: only 0 and 1 are supported for 2D matrices")]
+    fn test_mean_invalid_axis() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        mean(&matrix, Some(2));
+    }
+
+    #[test]
+    fn test_std_axis_0() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        let result = std(&matrix, Some(0), Some(1)); // Sample std (ddof=1)
+        
+        // Row 0: [1.0, 2.0], mean = 1.5, std = sqrt(((1-1.5)^2 + (2-1.5)^2) / 1) = sqrt(0.5) ≈ 0.707
+        // Row 1: [3.0, 4.0], mean = 3.5, std = sqrt(((3-3.5)^2 + (4-3.5)^2) / 1) = sqrt(0.5) ≈ 0.707
+        assert!((result.data[0][0] - 0.7071067811865476).abs() < 1e-10);
+        assert!((result.data[1][0] - 0.7071067811865476).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_std_axis_1() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 3.0],
+            vec![2.0, 4.0],
+        ]);
+        let result = std(&matrix, Some(1), Some(1)); // Sample std (ddof=1)
+        
+        // Col 0: [1.0, 2.0], mean = 1.5, std = sqrt(((1-1.5)^2 + (2-1.5)^2) / 1) = sqrt(0.5) ≈ 0.707
+        // Col 1: [3.0, 4.0], mean = 3.5, std = sqrt(((3-3.5)^2 + (4-3.5)^2) / 1) = sqrt(0.5) ≈ 0.707
+        assert!((result.data[0][0] - 0.7071067811865476).abs() < 1e-10);
+        assert!((result.data[0][1] - 0.7071067811865476).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_std_ddof_0() {
+        // Population standard deviation (ddof=0)
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        let result = std(&matrix, Some(0), Some(0));
+        
+        // Row 0: [1.0, 2.0], mean = 1.5, std = sqrt(((1-1.5)^2 + (2-1.5)^2) / 2) = sqrt(0.25) = 0.5
+        assert!((result.data[0][0] - 0.5).abs() < 1e-10);
+        assert!((result.data[1][0] - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_var_axis_0() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        let result = var(&matrix, Some(0), Some(1)); // Sample variance (ddof=1)
+        
+        // Row 0: [1.0, 2.0], mean = 1.5, var = ((1-1.5)^2 + (2-1.5)^2) / 1 = 0.5
+        assert!((result.data[0][0] - 0.5).abs() < 1e-10);
+        assert!((result.data[1][0] - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_var_axis_1() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 3.0],
+            vec![2.0, 4.0],
+        ]);
+        let result = var(&matrix, Some(1), Some(1)); // Sample variance (ddof=1)
+        
+        // Col 0: [1.0, 2.0], mean = 1.5, var = ((1-1.5)^2 + (2-1.5)^2) / 1 = 0.5
+        assert!((result.data[0][0] - 0.5).abs() < 1e-10);
+        assert!((result.data[0][1] - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_var_ddof_0() {
+        // Population variance (ddof=0)
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        let result = var(&matrix, Some(0), Some(0));
+        
+        // Row 0: [1.0, 2.0], mean = 1.5, var = ((1-1.5)^2 + (2-1.5)^2) / 2 = 0.25
+        assert!((result.data[0][0] - 0.25).abs() < 1e-10);
+        assert!((result.data[1][0] - 0.25).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_stats_default_parameters() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        
+        let mean_result = mean(&matrix, None); // Should default to axis 0
+        let std_result = std(&matrix, None, None); // Should default to axis 0, ddof 1
+        let var_result = var(&matrix, None, None); // Should default to axis 0, ddof 1
+        
+        // Verify shapes are correct
+        assert_eq!(mean_result.data.len(), 2);
+        assert_eq!(mean_result.data[0].len(), 1);
+        assert_eq!(std_result.data.len(), 2);
+        assert_eq!(std_result.data[0].len(), 1);
+        assert_eq!(var_result.data.len(), 2);
+        assert_eq!(var_result.data[0].len(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid axis: only 0 and 1 are supported for 2D matrices")]
+    fn test_std_invalid_axis() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        std(&matrix, Some(2), Some(1));
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid axis: only 0 and 1 are supported for 2D matrices")]
+    fn test_var_invalid_axis() {
+        let matrix = initialisers::matrix_from_data(vec![
+            vec![1.0, 2.0],
+            vec![3.0, 4.0],
+        ]);
+        var(&matrix, Some(3), Some(1));
+    }
+
+    #[test]
+    fn test_stats_single_element() {
+        let matrix = initialisers::matrix_from_data(vec![vec![5.0]]);
+        
+        let mean_result = mean(&matrix, Some(0));
+        let std_result = std(&matrix, Some(0), Some(1));
+        let var_result = var(&matrix, Some(0), Some(1));
+        
+        assert_eq!(mean_result.data, vec![vec![5.0]]);
+        // For single element, std and var should be 0 (or handled gracefully)
+        assert_eq!(std_result.data, vec![vec![0.0]]);
+        assert_eq!(var_result.data, vec![vec![0.0]]);
+    }
+}
